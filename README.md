@@ -4,7 +4,7 @@ Neat Errors for NodeJs
 This is a really neat error reporter for NodeJS, featuring code extraction,
 stack cleaning, syntax highlighting and tweakable output out-of-the-box.
 
-<a href="http://nl.tinypic.com?ref=jsyumt" target="_blank"><img src="http://i64.tinypic.com/jsyumt.png" border="0" alt="Image and video hosting by TinyPic"></a>
+<img src="https://raw.githubusercontent.com/samvv/node-neat-errors/master/media/example.png" alt="Screenshot of this package in action in the termial" />
 
 ## Usage
 
