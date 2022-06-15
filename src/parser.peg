@@ -1,0 +1,39 @@
+
+// https://github.com/v8/v8/wiki/Stack-Trace-API#appendix-stack-trace-format
+
+stackLine = stackLineFileAndLoc / stackLineAnom / stackLineFile
+stackLineFile = 'at ' file:filepath ':' line:num ':' column:num { return { file, line, column } }
+stackLineFileAndLoc = 'at ' path:(constructor / objpath) alias:(' ' as)? ' (' file:filepath ':' line:num ':' column:num ')' { return { path, alias: alias ? alias[1] : null, file, line, column } }
+stackLineAnom = 'at ' path:(constructor / objpath) alias:(' ' as)? ' (<anonymous>)' { return { path, alias: alias ? alias[1] : null, file: null } }
+
+as = '[as ' alias:ident ']' { return alias }
+
+num "number" = digits:[0-9]+ { return parseInt(digits.join(''), 10) }
+ident "identifier" = chars:(![ \.] .)+ { return chars.map(c => c[1]).join('') }
+
+filepath "file path" = chars:(!':' .)+ { return chars.map(c => c[1]).join('') }
+objpath "object path" = chars:(![ ] .)+ { 
+  let results = []
+  let building = ''
+  let prevIsDot = false
+  for (const c of chars.map(c => c[1])) {
+    if (c === '.') {
+      if (prevIsDot)
+        building += c
+      else {
+        prevIsDot = true
+        results.push(building)
+        building = ''
+      }
+    } else {
+      prevIsDot = false
+      building += c
+    }
+  }
+  results.push(building)
+  return results
+}
+
+constructor "new call" = 'new ' id:ident { const res = [id]; res.isConstructor = true; return res; }
+
+

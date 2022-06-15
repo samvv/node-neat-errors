@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "es2015",
+    "allowJs": true,
+    "module": "commonjs",
+    "outDir": "./"
+  },
+  "files": [
+    "src/register.ts",
+    "src/stack.ts",
+    "src/index.ts"
+  ]
+}
