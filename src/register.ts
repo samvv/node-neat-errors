@@ -1,5 +1,5 @@
 
-import Neat from "./"
+import Neat, { JsonRenderer } from "./"
 
 const neat = new Neat()
 

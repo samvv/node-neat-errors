@@ -1,13 +1,12 @@
 {
   "compilerOptions": {
-    "target": "es2015",
-    "allowJs": true,
+    "target": "ES2018",
     "module": "commonjs",
-    "outDir": "./"
+    "esModuleInterop": true,
+    "outDir": "./",
+    "forceConsistentCasingInFileNames": true,
+    "skipDefaultLibCheck": true
   },
-  "files": [
-    "src/register.ts",
-    "src/stack.ts",
-    "src/index.ts"
-  ]
+  "include": ["src"],
+  "exclude": ["node_modules"]
 }

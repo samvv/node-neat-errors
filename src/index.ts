@@ -1,63 +1,70 @@
 
 import * as path from "path"
 import * as fs from "fs"
-import * as cardinal from "cardinal"
-import * as chalk from "chalk"
+import cardinal from "cardinal"
+import chalk from "chalk"
 import * as stack from "./stack"
 import { upsearchSync, isNodeInternal } from "./util"
+import { SourceLocation, StackFrame } from "./parser"
 
 function cipherCount(num: number) {
   return Math.ceil(Math.log10(num))
 }
 
-function padLeft(str, width: number) {
-  str = str.toString()
+function padLeft(str: string, width: number) {
   return ' '.repeat(width-str.length)+str
 }
 
-const gutterStyle = chalk.gray.inverse;
+const gutterStyle = chalk.white.inverse;
 
 function indent(str: string, amnt: number) {
   return str.split('\n').map(line => ' '.repeat(amnt)+line).join('\n')
 }
 
-export function tsInternals() {
-  return [/__awaiter/]
-}
-
 export interface NeatOptions {
   cwd?: string
   internals?: RegExp[]
-  printAllCode?: boolean
+  printCode?: boolean
   fullStackTrace?: boolean
   nodeDir?: string
 }
 
+export class JsonRenderer {
+
+  public render(e: any) {
+    if (e instanceof Error) {
+      const cleaned = stack.parse(e);
+      return JSON.stringify(cleaned.map(frame => frame), undefined, 2);
+    }
+  }
+
+}
+
 export class Neat {
 
-  cwd: string
-  stack
-  printAllCode: boolean
-  fullStackTrace: boolean
-  nodeDir: string
+  private cwd: string
+  private printCode: boolean
+  private fullStackTrace: boolean
+  private nodeDir: string
 
-  constructor(options: NeatOptions = {}) {
+  public constructor(options: NeatOptions = {}) {
     this.cwd = options.cwd || process.cwd()
-    this.printAllCode = options.printAllCode !== undefined ? options.printAllCode : process.argv.indexOf('--print-all-code') !== -1
-    this.fullStackTrace = options.fullStackTrace !== undefined ? options.fullStackTrace : process.argv.indexOf('--full-stack-trace') !== -1
+    this.printCode = options.printCode ?? process.argv.indexOf('--no-print-code') === -1
+    this.fullStackTrace = options.fullStackTrace ?? process.argv.indexOf('--full-stack-trace') !== -1
     this.nodeDir = options.nodeDir || null
   }
 
-  renderCode(pos) {
-    let code
-    if (!pos.file || !path.isAbsolute(pos.file))
+  public renderCode(pos: SourceLocation) {
+    let code: string;
+    if (!pos.file || !path.isAbsolute(pos.file)) {
       return ''
-    if (isNodeInternal(pos.file))
+    }
+    if (isNodeInternal(pos.file)) {
       //if (this.nodeDir !== null)
         //code = fs.readFileSync(path.join(this.nodeDir, 'lib', pos.file)).toString()
       //else
         return ''
-    else {
+    } else {
       if (!fs.existsSync(pos.file))
         return ''
       code = fs.readFileSync(pos.file).toString()
@@ -67,7 +74,7 @@ export class Neat {
       try {
         code = cardinal.highlight(code)
       } catch(e) {
-
+        // pass
       }
     }
     let output = ''
@@ -75,7 +82,7 @@ export class Neat {
     const width = Math.max(cipherCount(pos.line+5), 2)
     for (let i = 0; i < split.length; ++i) {
       const line = split[i]
-      output += gutterStyle(padLeft(i+pos.line-2, width))
+      output += gutterStyle((i+pos.line-2).toString().padStart(width))
       output += ` ${line}\n`
       if (i === 2)
         output += gutterStyle(' '.repeat(width))+' '+' '.repeat(pos.column-1)+chalk.red('~')+'\n'
@@ -83,54 +90,57 @@ export class Neat {
     return output
   }
 
-  renderPath(filepath: string) {
+  public renderPath(filepath: string) {
     const packageJsonPath = upsearchSync(filepath, 'package.json')
     if (packageJsonPath !== null)
       return chalk.green(require(packageJsonPath).name || path.basename(path.dirname(packageJsonPath)))+'/'+path.relative(path.dirname(packageJsonPath), filepath)
     return path.relative(this.cwd, filepath)
   }
 
-  renderCall(parsed, options = {}) {
+  public renderFrame(parsed: StackFrame, options = {}) {
 
     let output = ''
-    if (parsed.file)
-      output += chalk.gray(` - ${this.renderPath(parsed.file)}:${parsed.line}:${parsed.column}`)
-    else
+    if (parsed.location) {
+      output += chalk.gray(` - ${this.renderPath(parsed.location.file)}:${parsed.location.line}:${parsed.location.column}`)
+    } else {
       output += chalk.green(`(native)`)
+    }
+
     if (parsed.path) {
       output += chalk.gray(': ')
-      if (parsed.path.isConstructor)
+      if (parsed.path.isConstructor) {
         output += `new ${parsed.path.join('.')}()`
-      else 
-      output += `${parsed.path.join('.')}`
+      } else {
+        output += `${parsed.path.join('.')}`
+      }
     }
     output += '\n'
 
-    if (parsed.file) {
-      if (isNodeInternal(parsed.file))
-        output += '   '+chalk.green(`(${chalk.green('native module')}: ${parsed.file})`)+'\n'
-      else
-        output += '   '+chalk.yellow(parsed.file)+'\n'
+    if (parsed.location.file) {
+      if (isNodeInternal(parsed.location.file)) {
+        output += '   '+chalk.green(`(${chalk.green('native module')}: ${parsed.location.file})`)+'\n'
+      } else {
+        output += '   '+chalk.yellow(parsed.location.file)+'\n'
+      }
     }
     output += `\n`
 
     return output
   }
 
-  render(e) {
+  public render(e: any) {
     let output = ''
     if (e instanceof Error) {
       output += chalk.bgRed.white(e.constructor.prototype.name)+' '+chalk.gray(e.message)+'\n\n'
       let cleaned = stack.parse(e)
       if (!this.fullStackTrace)
         cleaned = stack.clean(cleaned)
-      output += this.renderCall(cleaned[0])
-      output += indent(this.renderCode(cleaned[0]), 3)+'\n'
-      for (const call of cleaned.slice(1)) {
-        if (call !== null) {
-          output += this.renderCall(call)
-          if (this.printAllCode)
-            output += indent(this.renderCode(call), 3)+'\n'
+      output += this.renderFrame(cleaned[0])
+      output += indent(this.renderCode(cleaned[0].location), 3)+'\n'
+      for (const frame of cleaned.slice(1)) {
+        output += this.renderFrame(frame)
+        if (this.printCode) {
+          output += indent(this.renderCode(frame.location), 3)+'\n'
         }
       }
     }
